@@ -57,6 +57,7 @@ class Client extends Mutator {
                 'method'  => 'POST',
                 'content' => json_encode(['query' => $this->raw_query, 'variables' => $this->variables], JSON_NUMERIC_CHECK),
                 'header'  => $this->headers,
+                'ignore_errors' => true
             ]
         ], $this->context));
     }
@@ -129,7 +130,7 @@ class Client extends Mutator {
         return $this;
     }
 
-    
+
     /**
      * Allow to pass multiple headers to the client
      *
@@ -227,6 +228,11 @@ class Client extends Mutator {
             $result = file_get_contents($this->endpoint, false, $this->request);
             if ($format == Format::JSON) {
                 $response = json_decode($result, false);
+
+                if (!empty($response->errors)) {
+                    throw new \Exception($result);
+                }
+
                 return $response->data;
             } else {
                 $response = json_decode($result, true);
@@ -242,7 +248,7 @@ class Client extends Mutator {
     /**
      * Return data
      * @param $format String (array|json) define return format, array by default
-     * 
+     *
      * @return array by default
      */
     public function get(string $format=Format::ARRAY)
