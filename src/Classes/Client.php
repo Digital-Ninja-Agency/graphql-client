@@ -10,18 +10,18 @@ use BendeckDavid\GraphqlClient\Classes\Mutator;
 
 class Client extends Mutator {
 
-    private string $query;
-    public string $queryType;
+    private String $query;
+    public String $queryType;
     protected string $token;
-    public array $variables = [];
-    public array $rawHeaders = [
+    public Array $variables = [];
+    public Array $rawHeaders = [
         'Content-Type' => 'application/json',
         'User-Agent' => 'Laravel GraphQL client',
     ];
-    public array $context = [];
+    public Array $context = [];
 
     public function __construct(
-        protected string|null $endpoint
+        protected String|Null $endpoint
     )
     {
 
@@ -52,11 +52,18 @@ class Client extends Mutator {
      */
     public function getRequestAttribute()
     {
+       
+        $body = ['query' => $this->raw_query];
+        if (!empty($this->variables)) {
+            $body['variables'] = $this->variables;
+        }
+
         return stream_context_create(array_merge([
             'http' => [
-                'method'  => 'POST',
-                'content' => json_encode(['query' => $this->raw_query, 'variables' => $this->variables], JSON_NUMERIC_CHECK),
-                'header'  => $this->headers,
+            'method'  => 'POST',
+            'content' => json_encode($body, JSON_NUMERIC_CHECK),
+            'header'  => $this->headers,
+            'ignore_errors' => true
             ]
         ], $this->context));
     }
@@ -73,12 +80,12 @@ class Client extends Mutator {
 
         // Check if is a valid authentication scheme
         if (!array_key_exists($auth_scheme, config('graphqlclient.auth_schemes')))
-            throw new Exception('Invalid Graphql Client Auth Scheme');
+        throw new Exception('Invalid Graphql Client Auth Scheme');
 
         // fill Authentication header
         $authToken = isset($this->token) ? $this->token : config('graphqlclient.auth_credentials');
         data_fill($this->rawHeaders, config('graphqlclient.auth_header'),
-            config('graphqlclient.auth_schemes')[$auth_scheme].$authToken);
+        config('graphqlclient.auth_schemes')[$auth_scheme].$authToken);
     }
 
 
@@ -108,7 +115,7 @@ class Client extends Mutator {
      *
      * @return Client
      */
-    public function header(string $key, string $value)
+    public function header(String $key, String $value)
     {
         $this->rawHeaders = array_merge($this->rawHeaders, [
             $key => $value
@@ -123,19 +130,19 @@ class Client extends Mutator {
      *
      * @return Client
      */
-    public function context(array $context)
+    public function context(Array $context)
     {
         $this->context = $context;
         return $this;
     }
 
-
+    
     /**
      * Allow to pass multiple headers to the client
      *
      * @return Client
      */
-    public function withHeaders(array $headers)
+    public function withHeaders(Array $headers)
     {
         $this->rawHeaders = array_merge($this->rawHeaders, $headers);
 
@@ -148,7 +155,7 @@ class Client extends Mutator {
      *
      * @return Client
      */
-    public function with(array $variables)
+    public function with(Array $variables)
     {
         $this->variables = array_merge($this->variables, $variables);
 
@@ -161,7 +168,7 @@ class Client extends Mutator {
      *
      * @return Client
      */
-    private function generate(string $type, string $query)
+    private function generate(String $type, String $query)
     {
         $this->queryType = $type;
         $this->query = $query;
@@ -221,17 +228,24 @@ class Client extends Mutator {
      *
      * @return array
      */
-    public function makeRequest(string $format, bool $rawResponse = false)
+    public function makeRequest(string $format)
     {
         try {
+            // dd($this->endpoint, $this->request);
             $result = file_get_contents($this->endpoint, false, $this->request);
             if ($format == Format::JSON) {
                 $response = json_decode($result, false);
-                if ($rawResponse) return $response;
-                return $response->data;
+                // Add 'extensions' object to the response if it exists
+                if (isset($response->extensions)) {
+                    $response->extensions = json_decode(json_encode($response->extensions), true);
+                }
+                // Add 'data' object to the response if it exists
+                if (isset($response->data)) {
+                    $response->data = json_decode(json_encode($response->data), true);
+                }
+                return $response;
             } else {
                 $response = json_decode($result, true);
-                if ($rawResponse) return $response;
                 return Arr::get($response, "data");
             }
 
@@ -243,24 +257,13 @@ class Client extends Mutator {
 
     /**
      * Return data
-     * @param $format string (array|json) define return format, array by default
-     *
+     * @param $format String (array|json) define return format, array by default
+     * 
      * @return array by default
      */
-    public function get(string $format = Format::ARRAY)
+    public function get(string $format=Format::ARRAY)
     {
         return $this->makeRequest($format);
-    }
-
-    /**
-     * Return raw response
-     * @param $format string (array|json) define return format, array by default
-     *
-     * @return array by default
-     */
-    public function getRaw(string $format = Format::ARRAY)
-    {
-        return $this->makeRequest($format, true);
     }
 
 }
